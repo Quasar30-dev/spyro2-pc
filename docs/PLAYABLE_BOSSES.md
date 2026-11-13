@@ -41,7 +41,7 @@ python tools/boss-training/build_psx.py --out build/boss-psx-stage
 python tools/soi/mesa_disc_variant.py build/boss-psx-stage/manifest.json --out build/boss-psx-image --name boss-training --cue "path/to/retail.cue"
 ```
 
-The PSX controller prototype maps Select on the starting pad to switch, Triangle to a close attack, and Circle to a projectile. PC and PSX use separate combat implementations. Refer to the PSX validation status below before using an image.
+The PSX controller prototype maps Select on the starting pad to switch, Triangle to a close attack, and Circle to a projectile. PC and PSX use separate combat implementations. The rebuilt BIN passed slot-by-slot readback, including the three replacements. DuckStation failed during the retail transition into the arena, before the pad and attack loop could be verified. PSX playability and sound playback remain unverified.
 
 ## Automated PC checks
 
