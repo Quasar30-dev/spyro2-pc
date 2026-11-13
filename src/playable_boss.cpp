@@ -117,6 +117,7 @@ void PlayableBoss::tick(Game& game,bool blocked) {
     const auto& models=*game.object_models();
     const auto& bank=models.models.at(p.type);
     const auto& player=game.player;
+    if(blocked)attack_=Attack::None;
     const bool moving=std::hypot(player.velocity.x,player.velocity.z)>.35f;
     const auto clip=player.hurt_ticks?p.hurt:attack_==Attack::Close?p.close:attack_==Attack::Ranged?p.ranged:
         !player.grounded && player.swim.mode==WaterMode::Dry?p.airborne:moving?(sprint_?p.run:p.walk):p.idle;
@@ -133,7 +134,6 @@ void PlayableBoss::tick(Game& game,bool blocked) {
     if(body_.animation.next_clip!=clip)
         body_.animation=start_object_animation(bank,clip);
     tick_object_animation(bank,body_.animation);
-    if(blocked)attack_=Attack::None;
     if(attack_!=Attack::None)++attack_tick_;
     const auto direction=object_basis(body_).z;
     const float size=object_model_scale(body_);

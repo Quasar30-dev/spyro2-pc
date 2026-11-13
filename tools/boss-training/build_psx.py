@@ -93,13 +93,13 @@ def scene(child, triangles):
     data['parts'][1] = s2regions.encode(b'',records)
     data['parts'][2] = mesa_visibility.encode(len(records))
     tris = b''.join(terrain.pack_tri(piece) for flags,vertices,_ in triangles if flags&2
-                    for piece in terrain.split_tri(vertices[[0,2,1]]//16))
+                    for piece in terrain.split_tri(vertices//16))
     data['collision'] = s2collision.encode(tris,b'',b'',terrain.cells_exact(tris))
     return s2scene_build.join(data),material
 
 def gameplay(child, actors):
     data = bytearray(child)
-    struct.pack_into('<iii',data,0,*SPAWN)
+    struct.pack_into('<iii',data,0,SPAWN[0],SPAWN[1],SPAWN[2]+356)
     data[0x0e] = 64
     at = 0x2c
     for i in range(8):
@@ -237,7 +237,7 @@ def build_overlay(original):
     output=bytearray(original)+bytes(scratch-len(original))
     a=Asm(BASE+scratch)
     start=a.pc
-    for value in [0]*10: a.emit(value) # guise, attack age, attack, shot life, velocity XYZ, cooldown, probe
+    for _ in range(9): a.emit(0)  # form, attack age, attack, shot life, shot velocity XYZ, hide flag, spawn flag
     entry=a.pc
     a.addiu('sp','sp',-64)
     for i,r in enumerate(('ra','s0','s1','s2','s3','s4','s5','s6')):
@@ -336,10 +336,10 @@ def build_overlay(original):
     a.bne('v0','zero','hide_shot')
     a.li('t0',0x40);a.sb('t0',76,'s6')
     a.jump('done')
-    a.label('spyro');a.sb('zero',76,'s1')
+    a.label('spyro');a.sb('zero',76,'s1');a.sw('zero',60,'s1');a.sh('zero',64,'s1')
     a.lw('t0',28,'s0');a.beq('t0','zero','hide_shot')
     a.li('t0',0x8006a250);a.sw('zero',0,'t0');a.sw('zero',28,'s0')
-    a.label('hide_shot');a.sb('zero',76,'s6');a.sw('zero',12,'s0')
+    a.label('hide_shot');a.sb('zero',76,'s6');a.sw('zero',60,'s6');a.sh('zero',64,'s6');a.sw('zero',12,'s0')
     a.label('done')
     for i,r in enumerate(('ra','s0','s1','s2','s3','s4','s5','s6')):
         a.lw(r,60-4*i,'sp')
@@ -364,17 +364,23 @@ def build_overlay(original):
     a.lw('ra',12,'sp');a.addiu('sp','sp',16);a.jr('ra')
     output.extend(a.finish())
     put32(output,HOOK-BASE,(3<<26)|((entry&0x0fffffff)>>2))
-    # The two controller records are not encounter AI. Other Glimmer actors
-    # still run via the original switch, including the basket targets.
-    intercept=0x80070478
+    intercept=0x8007041c
+    assert u32(original,intercept-BASE)==0x8fae03a0
+    # The training arena only needs the original active-list builder and
+    # animation clock. Process its static baskets using their incoming attack
+    # word instead of calling unrelated story/terrain handlers.
     a=Asm(BASE+len(output))
     dispatch=a.pc
-    a.li('t0',0x80066f14);a.lw('t0',0,'t0')
-    a.beq('s4','t0',0x8007e1ac)
-    a.addiu('t0','t0',88);a.beq('s4','t0',0x8007e1ac)
-    a.label('original');a.li('v0',0x1aa);a.beq('v1','v0',0x80075024)
-    a.words[-1]=0x286201ab
-    a.jump(intercept+12)
+    a.li('t0',0x80066f14);a.lw('t0',0,'t0');a.addiu('t0','t0',176)
+    a.addiu('t1','t0',8*88)
+    a.label('targets')
+    a.lw('t2',24,'t0')
+    a.beq('t2','zero','next_target')
+    a.sw('zero',24,'t0')
+    a.li('t2',0xfd);a.sb('t2',72,'t0')
+    a.label('next_target');a.addiu('t0','t0',88)
+    a.bne('t0','t1','targets')
+    a.jump(0x8007e1c4)
     output.extend(a.finish())
     put32(output,intercept-BASE,(2<<26)|((dispatch&0x0fffffff)>>2))
     put32(output,intercept+4-BASE,0)

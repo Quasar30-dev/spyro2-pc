@@ -675,6 +675,7 @@ struct Workbench {
     }
     PlayableCharacter selected_character=PlayableCharacter::Spyro;
     unsigned boss_scale=3;
+    bool boss_training_check=false;
     void play() {if(!level)return;remember_settings();audio.speech({});game=std::make_unique<Game>(*level,document.scene,camera_settings,&object_models,spyro.get());
         if(level->universe){if(universe_ready)universe_campaign.apply(*game,&object_models);}else if(campaign_ready && level->custom_name.empty() && !level->source_area)campaign.apply(*game,&object_models);playing=true;studio=false;object_studio=false;
         game->upgrades=current_campaign().upgrades;game->upgrade_hud_settings=current_campaign().upgrade_hud_settings;game->destruction_settings=current_campaign().destruction_settings;
@@ -1800,6 +1801,12 @@ struct Workbench {
             if(dialogue_input.choice>=0)input.dialogue.choice=dialogue_input.choice;dialogue_input={};
             if(!controls)input={};
             if(scripted_input)scripted_input(input);
+            if(boss_training_check) {
+                const auto tick=game->clock.ticks();
+                input={};
+                input.dialogue.interact=tick==4 || tick==155 || tick==306;
+                input.flame_pressed=tick==10 || tick==161 || tick==312;
+            }
             if(controls)filter_dialogue_input(input.dialogue);
             const auto simulation_start=std::chrono::steady_clock::now();
             game->camera.recentre_delay=preferences.camera_recentre_seconds*60;
@@ -1966,7 +1973,7 @@ struct Workbench {
 
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int) {
     unsigned smoke_frames=0,slot=15,initial_animation=0,initial_object=UINT32_MAX;bool begin_play=false,level_view=false,replay=false,paced=false,swim_replay=false,show_fps=false;int ps1_fov=-1,ps1_hud=-1,camera_recentre=-1;bool recall_hud_flag=false;
-    bool unlock_elements=false,dark_spyro=false,dark_smoke=true;int equip_element=-1;std::string element_replay;
+    bool unlock_elements=false,dark_spyro=false,dark_smoke=true,boss_training_check=false;int equip_element=-1;std::string element_replay;
     bool spyro3_edition=false,menu_levels=false;   // --spyro3: the Spyro 3 launcher's edition
     std::optional<BossDifficulty> boss_difficulty;
     float initial_pose=-1,initial_object_pose=-1;unsigned initial_object_model=UINT32_MAX,initial_object_clip=0;std::optional<std::array<float,3>> studio_view;
@@ -2032,6 +2039,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int) {
             else if(arg==L"--mute")mute_audio=true;
             else if(arg==L"--headless"){headless=true;begin_play=true;}
             else if(arg==L"--no-capture")no_capture=true;
+            else if(arg==L"--boss-training-check")boss_training_check=true;
             else if(arg==L"--capture-fullscreen")capture_fullscreen=true;
             else if(arg==L"--hide-hud")hide_capture_hud=true;
             else if(arg==L"--gems" && i+1<count)start_gems=static_cast<unsigned>(std::stoul(args[++i]));   // gems in hand (Moneybags payments)
@@ -2268,6 +2276,11 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int) {
             if(studio_view){app.model_yaw=(*studio_view)[0]*std::numbers::pi_v<float>/180;app.model_pitch=std::clamp((*studio_view)[1]*std::numbers::pi_v<float>/180,-1.2f,1.4f);app.model_distance=std::clamp((*studio_view)[2],0.6f,12.0f);}
         }
         if(begin_play && app.level)app.play();
+        if(boss_training_check) {
+            if(smoke_frames<400 || !app.playing || !app.game || !PlayableBoss::at_switch(*app.game))
+                throw FormatError("--boss-training-check requires Boss Training Ground and at least 400 frames");
+            app.boss_training_check=true;
+        }
         if(tunnel_replay) {
             if(!app.game || app.game->level.water_volumes.empty())throw FormatError("Tunnel replay requires the flooded Crownworks network");
             app.tunnel_replay=true;app.game->play_scene.spawn={-26,3.52f,-15.3f};app.game->respawn();
@@ -2600,6 +2613,9 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int) {
             if(pad_check)pad_validation.require(pad_validation.finished,"the controller script did not finish");
             if(hide_workbench_frame && (app.workbench_toggles!=1 || !app.frontend))throw FormatError("F1 did not minimise the workbench");
             if(!app.error.empty())throw FormatError("Smoke test encountered UI error: "+app.error);
+            if(boss_training_check && (app.game->playable_boss.character()!=PlayableCharacter::Ripto ||
+                app.audio.effects_played<6 || app.renderer.rendered_animated_objects()==0))
+                throw FormatError("Boss training check failed character, audio or rendering validation");
             if(upgrade_workbench_check && app.game->abilities.melee_swings!=3)
                 throw FormatError("Workbench upgrades survived Play, but real J input failed to trigger all three melee strikes");
             if(!save_on_exit.empty()) {app.current_save_path()=save_on_exit;app.save_game(window,false);}

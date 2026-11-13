@@ -34,4 +34,19 @@ Crush's walking, chase, recoil and club sequences are corroborated by overlay 30
 
 ## PSX development build
 
-The source builder creates replacement WAD slots for the same arena from a local US retail extraction, then the disc builder applies them to a copy of a local retail CUE. The image is intended for private testing. See [the PSX builder](../tools/boss-training/build_psx.py).
+The source builder creates replacement WAD slots from a local US retail extraction. The disc builder writes a separate image from your local CUE. Python requires NumPy, Pillow, and Capstone.
+
+```powershell
+python tools/boss-training/build_psx.py --out build/boss-psx-stage
+python tools/soi/mesa_disc_variant.py build/boss-psx-stage/manifest.json --out build/boss-psx-image --name boss-training --cue "path/to/retail.cue"
+```
+
+The PSX controller prototype maps Select on the starting pad to switch, Triangle to a close attack, and Circle to a projectile. PC and PSX use separate combat implementations. Refer to the PSX validation status below before using an image.
+
+## Automated PC checks
+
+The installed Workbench ran the training arena for 410 frames with all three forms selected in sequence. The run recorded 11 played sound events, four animated objects in its final frame and zero script faults. Simulation checks also exercised switching, all scale settings, movement, jumping, target hits and model availability across 30 retail level banks. The core, traversal and audio-codec suites passed.
+
+```powershell
+build/Release/spyro_workbench.exe --game data/disc --custom-level data/custom-levels/boss-training/boss-training.s2world --workbench --headless --frames 410 --no-capture --boss-training-check
+```
