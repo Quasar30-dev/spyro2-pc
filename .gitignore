@@ -1,0 +1,10 @@
+/Spyro 2 - Riptos Rage (USA)/
+/data/
+/build/
+/research/local/
+/tools/local.json
+/.vs/
+__pycache__/
+*.pyc
+imgui.ini
+
